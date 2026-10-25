@@ -7,6 +7,7 @@
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
     <meta name="theme-color" content="#f3e7d2" />
+    <link rel="preload" as="image" href="assets/bg.png" fetchpriority="high" />
     <title>Nazar Utar Du</title>
     <style>
       :root {
@@ -1968,6 +1969,28 @@
           }
         }
         const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        function preloadLayoutAssets() {
+          const earlyAssets = new Set([
+            "sun-eye",
+            "toran-side",
+            "toran-3",
+            "peacock",
+            "elephant-1",
+          ]);
+          for (const name of new Set(layout.map((item) => item.name))) {
+            if (name === "bg") continue;
+            const hint = document.createElement("link");
+            hint.rel = "preload";
+            hint.as = "image";
+            hint.href = `assets/${name}.png`;
+            hint.setAttribute(
+              "fetchpriority",
+              earlyAssets.has(name) ? "high" : "low",
+            );
+            document.head.append(hint);
+          }
+        }
+        preloadLayoutAssets();
         function finishContentReady(ready) {
           clearTimeout(contentReadyTimer);
           if (resolveContentReady) {
