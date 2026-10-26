@@ -1587,6 +1587,7 @@
         object-fit: contain;
         transform: none;
         animation: aarti-traverse 5s ease-in-out 2 alternate both;
+        z-index: 10;
       }
       .ritual-animation.people-run {
         position: absolute;
@@ -1620,6 +1621,7 @@
         align-items: end;
         gap: clamp(0px, 0.45vw, 8px);
         transform: translateX(-50%);
+        z-index: 5;
       }
       .people-ensemble img {
         display: block;
@@ -1932,6 +1934,7 @@
           shotRequested = false,
           ritualBusy = false,
           peopleOnStage = false,
+          aartiRunning = false,
           placementKind = "",
           toastTimer,
           iframeTimer,
@@ -2477,7 +2480,6 @@
         }
         function togglePeople() {
           const peopleButton = band.querySelector('[data-ritual="people"]');
-          const buttons = [...band.querySelectorAll(".ritual-option")];
           if (peopleOnStage) {
             if (animation.classList.contains("people-leaving")) return;
             peopleOnStage = false;
@@ -2487,25 +2489,18 @@
             setTimeout(() => {
               peopleEnsemble.hidden = true;
               animation.classList.remove(
-                "active",
                 "people-run",
                 "people-leaving",
               );
-              band.classList.remove("busy");
-              buttons.forEach((button) => (button.disabled = false));
-              ritualBusy = false;
+              if (!aartiRunning) {
+                animation.classList.remove("active");
+              }
               say("The stage is yours again.");
             }, 1850);
             return;
           }
-          if (ritualBusy) return;
-          ritualBusy = true;
           peopleOnStage = true;
           animation.classList.add("active", "people-run");
-          band.classList.add("busy");
-          buttons.forEach((button) => {
-            if (button !== peopleButton) button.disabled = true;
-          });
           peopleEnsemble.hidden = false;
           peopleButton.setAttribute("aria-pressed", "true");
           say("A little more company on stage.");
@@ -2536,40 +2531,34 @@
             togglePeople();
             return;
           }
-          if (ritualBusy) return;
           if (kind === "tika" || kind === "nimbu") {
             armPlacement(kind);
             return;
           }
-          ritualBusy = true;
-          animation.classList.add("active");
-          band.classList.add("busy");
-          const buttons = [...band.querySelectorAll(".ritual-option")];
-          buttons.forEach((button) => (button.disabled = true));
-          try {
-            if (kind === "aarti") {
-              say("Aarti le lo!");
-              animation.classList.add("aarti-run");
-              gif.hidden = false;
-              gif.classList.add("visible");
-              gif.style.removeProperty("--float-left");
-              gif.style.removeProperty("--float-right");
-              gif.style.removeProperty("--float-y");
+          if (kind === "aarti") {
+            if (aartiRunning) return;
+            aartiRunning = true;
+            const aartiButton = band.querySelector('[data-ritual="aarti"]');
+            if (aartiButton) aartiButton.disabled = true;
+            animation.classList.add("active", "aarti-run");
+            say("Aarti le lo!");
+            gif.hidden = false;
+            gif.classList.add("visible");
+            gif.style.removeProperty("--float-left");
+            gif.style.removeProperty("--float-right");
+            gif.style.removeProperty("--float-y");
+            try {
               await wait(10000);
+            } finally {
               hideMedia(gif);
               animation.classList.remove("aarti-run");
+              if (!peopleOnStage) {
+                animation.classList.remove("active");
+              }
+              aartiRunning = false;
+              if (aartiButton) aartiButton.disabled = false;
               say("Aarti complete.");
             }
-          } finally {
-            ritualBusy = false;
-            animation.classList.remove(
-              "active",
-              "aarti-run",
-              "people-run",
-              "people-leaving",
-            );
-            band.classList.remove("busy");
-            buttons.forEach((button) => (button.disabled = false));
           }
         }
         band
