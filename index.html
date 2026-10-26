@@ -1939,8 +1939,41 @@
           contentReadyTimer,
           resolveContentReady = null,
           frame = 0;
-        const bellAudio = new Audio("sound/bell-sound.mp3");
-        bellAudio.preload = "auto";
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        let bellAudioCtx = null;
+        let bellAudioBuffer = null;
+        const bellAudioFallback = new Audio("sound/bell-sound.mp3");
+        bellAudioFallback.preload = "auto";
+        function initBellAudio() {
+          if (!bellAudioCtx && AudioCtxClass) {
+            try {
+              bellAudioCtx = new AudioCtxClass();
+            } catch {}
+          }
+          if (bellAudioCtx && !bellAudioBuffer) {
+            fetch("sound/bell-sound.mp3")
+              .then((res) => res.arrayBuffer())
+              .then((buf) => bellAudioCtx.decodeAudioData(buf))
+              .then((decoded) => {
+                bellAudioBuffer = decoded;
+              })
+              .catch(() => {});
+          }
+        }
+        function unlockBellAudio() {
+          if (bellAudioCtx && bellAudioCtx.state === "suspended") {
+            bellAudioCtx.resume().catch(() => {});
+          }
+        }
+        window.addEventListener("pointerdown", unlockBellAudio, {
+          passive: true,
+          capture: true,
+        });
+        window.addEventListener("keydown", unlockBellAudio, {
+          passive: true,
+          capture: true,
+        });
+        initBellAudio();
         function readLayout() {
           try {
             const fallback = window.NAZAR_DEFAULT_LAYOUT,
@@ -1999,21 +2032,43 @@
           }
         }
         function playBellSound() {
-          bellAudio.currentTime = 0;
-          void bellAudio.play().catch(() => {});
+          if (bellAudioCtx && bellAudioBuffer) {
+            if (bellAudioCtx.state === "suspended") {
+              bellAudioCtx.resume().catch(() => {});
+            }
+            try {
+              const source = bellAudioCtx.createBufferSource();
+              source.buffer = bellAudioBuffer;
+              source.connect(bellAudioCtx.destination);
+              source.start(0);
+              return;
+            } catch {}
+          }
+          if (bellAudioFallback) {
+            try {
+              const clone = bellAudioFallback.cloneNode();
+              clone.play().catch(() => {
+                bellAudioFallback.currentTime = 0;
+                bellAudioFallback.play().catch(() => {});
+              });
+            } catch {
+              bellAudioFallback.currentTime = 0;
+              bellAudioFallback.play().catch(() => {});
+            }
+          }
         }
         function ringBell(event) {
           event.stopPropagation();
+          playBellSound();
           const bell = event.currentTarget;
           bell.classList.remove("bell-ringing");
-          void bell.offsetWidth;
+          void bell.offsetHeight;
           bell.classList.add("bell-ringing");
           clearTimeout(bell.ringTimer);
           bell.ringTimer = setTimeout(
             () => bell.classList.remove("bell-ringing"),
             1250,
           );
-          playBellSound();
         }
         const say = (message) => {
           status.textContent = message;
@@ -2153,6 +2208,9 @@
             img.setAttribute("role", "button");
             img.setAttribute("aria-label", "Ring the bell");
             img.title = "Click to ring";
+            img.addEventListener("pointerdown", unlockBellAudio, {
+              passive: true,
+            });
             img.addEventListener("click", ringBell);
             img.addEventListener("keydown", (event) => {
               if (event.key === "Enter" || event.key === " ") {
